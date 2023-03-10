@@ -11,7 +11,7 @@ import SwiftUI
 struct habitApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            SplashView(viewModel: SplashViewModel())
         }
     }
 }
