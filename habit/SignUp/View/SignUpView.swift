@@ -176,10 +176,10 @@ struct SignUpView_Previews: PreviewProvider {
     static var previews: some View {
         ForEach(ColorScheme.allCases, id: \.self) { value in
             
-            let viewModel = SignUpViewModel()
+            let viewModel = SignUpViewModel(interector: SignUpInteractor())
             SignUpView(viewModel: viewModel)
                 .preferredColorScheme(value)
-            
+
         }
     }
 }

@@ -20,7 +20,21 @@ class SignUpViewModel: ObservableObject {
     
     var publisher: PassthroughSubject<Bool, Never>!
     
+    private var cancellableSignUp: AnyCancellable?
+    private var cancellableSignIn: AnyCancellable?
+    
     @Published var uiState: SignUpUIState = .none
+    
+    private let interactor: SignUpInteractor
+    
+    init(interector: SignUpInteractor) {
+        self.interactor = interector
+    }
+    
+    deinit {
+        cancellableSignUp?.cancel()
+        cancellableSignIn?.cancel()
+    }
     
     func signUp() {
         self.uiState = .loading
@@ -42,55 +56,58 @@ class SignUpViewModel: ObservableObject {
         formatter.dateFormat = "yyyy-MM-dd"
         let birthday = formatter.string(from: dateFormatted)
         
+        let signUpRequest = SignUpRequest(fullName: fullName,
+                                          email: email,
+                                          password: password,
+                                          document: document,
+                                          phone: phone,
+                                          birthday: birthday,
+                                          gender: gender.index)
         
-        WebService.postUser(request: SignUpRequest(fullName: fullName,
-                                                   email: email,
-                                                   password: password,
-                                                   document: document,
-                                                   phone: phone,
-                                                   birthday: birthday,
-                                                   gender: gender.index)) { (successResponse, errorResponse) in
-            
-            if let error = errorResponse {
-                
-                // Só posso modificar a tela através da Main Thread por isso tenho que fazer o Dispatch
-                DispatchQueue.main.async {
-                    self.uiState = .error(error.detail)
+        cancellableSignUp = interactor.postUser(singUpRequest: signUpRequest)
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                // error | finishded
+                switch completion {
+                    case .failure(let appError):
+                        self.uiState = .error(appError.message)
+                        break
+                    case .finished:
+                        break
                 }
-                
+            } receiveValue: { created in
+                if created {
+                    
+                    self.cancellableSignIn = self.interactor.login(singInRequest: SignInRequest(email: self.email, password: self.password))
+                        .receive(on: DispatchQueue.main)
+                        .sink { completion in
+                            switch completion {
+                                case .failure(let appError):
+                                    self.uiState = .error(appError.message)
+                                    break
+                                case .finished:
+                                    break
+                            }
+                        } receiveValue: { successSignIn in
+                            print(successSignIn)
+                            
+                            let auth  = UserAuth(
+                                idToken: successSignIn.accessToken,
+                                refreshToken: successSignIn.refreshToken,
+                                expires: Date().timeIntervalSince1970 + Double(successSignIn.expires),
+                                tokenType: successSignIn.tokenType
+                            )
+                            
+                            self.interactor.insertAuth(userAuth: auth)
+                            
+                            self.publisher.send(created)
+                            self.uiState = .success
+                        }
+                    
+                }
             }
-            
-            if let success = successResponse {
-                
-//                WebService.login(request: SignInRequest(email: self.email, password: self.password)) { (successResponse, errorResponse) in
-//                    
-//                    if let errorSignIn = errorResponse {
-//                        
-//                        // Só posso modificar a tela através da Main Thread por isso tenho que fazer o Dispatch
-//                        DispatchQueue.main.async {
-//                            self.uiState = .error(errorSignIn.detail.message)
-//                        }
-//                        
-//                    }
-//                    
-//                    if let successSignIn = successResponse {
-//                        DispatchQueue.main.async {
-//                            self.publisher.send(success)
-//                            self.uiState = .success
-//                        }
-//                    }
-//                    
-//                }
-                
-            }
-            
-        }
         
-        //        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-        //            //self.uiState = .error("Houve um erro no servidor")
-        //            self.uiState = .success
-        //            self.publisher.send(true)
-        //        }
+        
     }
     
 }

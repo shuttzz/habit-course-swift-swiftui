@@ -19,7 +19,7 @@ struct SplashView: View {
                 case .goToSignInScreen:
                     viewModel.signInView()
                 case .goToHomeScreen:
-                    Text("goToHomeScreen")
+                    viewModel.homeView()
                 case .error(let msg):
                     loadingView(error: msg)
             }
@@ -52,7 +52,7 @@ extension SplashView {
 struct SplashView_Previews: PreviewProvider {
     static var previews: some View {
         ForEach(ColorScheme.allCases, id: \.self) { value in
-            let viewModel = SplashViewModel()
+            let viewModel = SplashViewModel(interactor: SplashInterector())
             SplashView(viewModel: viewModel)
                 .preferredColorScheme(value)
         }
